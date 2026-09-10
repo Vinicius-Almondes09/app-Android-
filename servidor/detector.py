@@ -4,6 +4,7 @@ from ultralytics import YOLO
 # Carrega o modelo de detecção
 modelo = YOLO("yolo11n.pt")
 
+ 
 
 def detectar_objetos(caminho_imagem):
     """

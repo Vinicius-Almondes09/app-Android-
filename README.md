@@ -1,968 +1,391 @@
-Trabalho 02 – Sistemas Distribuídos
+# Trabalho 02 – Sistemas Distribuídos
 
-Aplicativo Android para Detecção de Objetos
+## Aplicativo Android para Detecção de Objetos (Foto via Botão → Servidor Python por Sockets)
 
-Este projeto foi desenvolvido como parte da Atividade 02 da disciplina de Sistemas Distribuídos**.
+Este projeto implementa a **Atividade 2** da disciplina de Sistemas Distribuídos: um
+**aplicativo Android (Flutter)** tira uma foto e a envia via **Socket TCP** para um
+**servidor Python**, que executa a **detecção de objetos** com o modelo **YOLO11n**
+(OpenCV/Ultralytics) e retorna ao aplicativo os objetos identificados.
 
-O objetivo é desenvolver uma aplicação distribuída composta por um aplicativo Android desenvolvido em Flutter** e um servidor desenvolvido em Python**.
-
-O aplicativo é responsável por capturar uma fotografia e enviá-la ao servidor por meio de uma conexão Socket TCP**. O servidor recebe a imagem, realiza a detecção dos objetos utilizando o modelo YOLO11n** e retorna ao aplicativo os objetos identificados.
-
----
-
-1. Tecnologias utilizadas
-
-Servidor
-
-Python
-
-Socket TCP
-
-Ultralytics
-
-YOLO11n
-
-OpenCV
-
-Aplicativo Android
-
-Flutter
-
-Dart
-
-Pacote camera
-
-Pacote image
-
-Biblioteca dart:io
-
-Socket TCP
-
-O pacote camera é utilizado para acessar a câmera e capturar a fotografia.
-
-O pacote image é utilizado para preparar a fotografia em formato JPEG, com qualidade aproximada de 80 e largura máxima de 1280 pixels.
-
-A biblioteca dart:io, pertencente ao próprio Dart, é utilizada para estabelecer a comunicação Socket TCP com o servidor.
+```
+Celular (app Flutter)          PC (servidor Python)
+        │                              │
+        ▼                              │
+ Captura da foto                      │
+        │                              │
+ JPEG – qualidade 80                  │
+ largura ≤ 1280 px                    │
+        │                              │
+ Socket TCP ── 4 bytes (tamanho) ────►│
+ Socket TCP ── bytes da foto ────────►│
+        │                              ▼
+        │                    Recebe, salva (timestamp)
+        │                    e roda YOLO11n
+        │                              │
+        │◄──── resposta (objetos) ─────│
+        ▼                              │
+ Resultado na tela                    │
+```
 
 ---
 
-2. Estrutura do projeto
+## 1. O que você precisa baixar/instalar
 
-A estrutura principal do projeto é:
+### No notebook (PC que vai rodar o servidor)
 
+| Item | Onde baixar | Por quê |
+|---|---|---|
+| **Python 3.10 ou superior** | https://www.python.org/downloads/ | O servidor é escrito em Python. No Windows, marque a opção **"Add Python to PATH"** na instalação |
+| **O código deste projeto** | Clone do GitHub (ou a pasta `.zip`) | Contém o servidor, o app e o modelo `yolo11n.pt` |
+| **Bibliotecas Python** | Instaladas via `pip` (passo a passo abaixo) | `ultralytics` (YOLO11n) e `opencv-python` (processamento de imagem) |
 
-trabalho_02_SD/
+> ⚠️ O modelo `yolo11n.pt` **já vem dentro da pasta `servidor/`** — não precisa baixar
+> separadamente. Se ele estiver faltando, o Ultralytics baixa automaticamente na
+> primeira execução (é preciso internet).
 
-│
+### No notebook (somente se quiser gerar/alterar o app)
 
-├── servidor/
+| Item | Onde baixar | Por quê |
+|---|---|---|
+| **Flutter SDK** | https://docs.flutter.dev/get-started/install | Compila o app Android |
+| **Android Studio** | https://developer.android.com/studio | SDK Android, emulador e ferramentas de build |
+| **Git** | https://git-scm.com/ | Para clonar o repositório |
 
-│   ├── server.py
+> 💡 **Não é obrigatório ter Flutter/Android Studio**: se você só quer usar o app,
+> instale direto no celular o APK pronto (`app-debug.apk`, gerado com
+> `flutter build apk --debug --target-platform android-arm64`). O Flutter só é
+> necessário para recompilar ou alterar o aplicativo.
 
-│   ├── detector.py
+### No celular (Android)
 
-│   ├── cliente_teste.py
+| Item | Onde baixar | Por quê |
+|---|---|---|
+| **O APK do app** | Copie `app_detector/build/app/outputs/flutter-apk/app-debug.apk` para o celular (ou use `flutter run` com cabo USB) | É o aplicativo que tira a foto e conversa com o servidor |
 
-│   ├── requirements.txt
-
-│   ├── yolo11n.pt
-
-│   └── recebidas/
-
-│
-
-├── app_detector/
-
-│   ├── android/
-
-│   ├── lib/
-
-│   │   └── main.dart
-
-│   └── pubspec.yaml
-
-│
-
-└── README.md
-
-
-O arquivo cliente_teste.py foi utilizado como ferramenta auxiliar para testar o servidor antes da integração com o aplicativo Android.
-
-A implementação principal do aplicativo está concentrada no arquivo:
-
-
-app_detector/lib/main.dart
-
-
-Os demais arquivos da estrutura Flutter foram gerados automaticamente pelo próprio framework.
+Além disso, o celular precisa:
+- **Estar na mesma rede Wi-Fi que o notebook** (mesmo roteador; evite redes "guest" ou de convidados, que costumam isolar os aparelhos).
+- **Permitir instalação de apps de fontes desconhecidas** (o Android pede autorização na hora de instalar o APK).
 
 ---
 
-3. Funcionamento do sistema
+## 2. Passo a passo – Rodando o servidor no PC
 
-O sistema utiliza uma arquitetura cliente-servidor.
+Abra o terminal (Prompt de Comando/PowerShell no Windows, Terminal no Linux/macOS) e:
 
-O funcionamento previsto é:
+```bash
+# 1. Entre na pasta do servidor
+cd servidor
 
-1. O servidor Python é iniciado e fica aguardando uma conexão.
-
-2. O usuário informa no aplicativo o endereço IP e a porta do servidor.
-
-3. O usuário seleciona Tirar e Analisar**.
-
-4. O aplicativo captura uma fotografia.
-
-5. A imagem é preparada em formato JPEG.
-
-6. Caso necessário, a largura é reduzida para no máximo 1280 pixels.
-
-7. A imagem é codificada com qualidade JPEG 80.
-
-8. O aplicativo estabelece uma conexão Socket TCP com o servidor.
-
-9. São enviados 4 bytes contendo o tamanho da imagem.
-
-10. Em seguida, são enviados os bytes da fotografia.
-
-11. O servidor recebe e salva a fotografia.
-
-12. O YOLO11n realiza a detecção dos objetos.
-
-13. O servidor envia o resultado para o aplicativo.
-
-14. O aplicativo apresenta os objetos identificados ou Nada Detectado.
-
-15. O usuário pode capturar outra fotografia para realizar uma nova análise.
-
-Fluxo:
-
-
-Aplicativo Android
-
-       │
-
-       ▼
-
-Captura da fotografia
-
-       │
-
-       ▼
-
-JPEG
-
-Qualidade 80
-
-Largura ≤ 1280 px
-
-       │
-
-       ▼
-
-Socket TCP
-
-       │
-
-       ├── 4 bytes: tamanho
-
-       └── N bytes: fotografia
-
-              │
-
-              ▼
-
-       Servidor Python
-
-              │
-
-              ▼
-
-          YOLO11n
-
-              │
-
-              ▼
-
-      Objetos detectados
-
-              │
-
-              ▼
-
-        Resposta TCP
-
-              │
-
-              ▼
-
-      Aplicativo Android
-
-              │
-
-              ▼
-
-       Resultado na tela
-
-
----
-
-4. Protocolo de comunicação
-
-A comunicação entre o aplicativo e o servidor utiliza Socket TCP**.
-
-Foi definido o seguinte protocolo:
-
-
-4 bytes + N bytes
-
-
-Os primeiros 4 bytes** representam o tamanho da fotografia.
-
-Os próximos N bytes** correspondem ao conteúdo da imagem JPEG.
-
-O tamanho é representado por um inteiro de 32 bits utilizando Big Endian**.
-
-Fluxo da comunicação:
-
-
-Cliente                         Servidor
-
-   │                               │
-
-   │── 4 bytes: tamanho ──────────►│
-
-   │                               │
-
-   │── N bytes: imagem JPEG ──────►│
-
-   │                               │
-
-   │                         Processamento
-
-   │                            YOLO11n
-
-   │                               │
-
-   │◄──── resultado da análise ────│
-
-   │                               │
-
-
----
-
-5. Servidor Python
-
-O servidor foi implementado no arquivo:
-
-
-servidor/server.py
-
-
-Suas principais responsabilidades são:
-
-criar o Socket TCP;
-
-aguardar conexões;
-
-receber o tamanho da imagem;
-
-receber os bytes da fotografia;
-
-salvar a fotografia;
-
-executar a detecção de objetos;
-
-enviar o resultado ao cliente;
-
-continuar aguardando novas conexões.
-
-O servidor utiliza:
-
-
-HOST = 0.0.0.0
-
-PORT = 5000
-
-
-O endereço 0.0.0.0 permite que o servidor aceite conexões pelas interfaces de rede disponíveis no computador.
-
----
-
-6. Detecção de objetos
-
-A detecção é realizada utilizando a biblioteca Ultralytics** e o modelo:
-
-
-YOLO11n
-
-
-O detector está implementado em:
-
-
-servidor/detector.py
-
-
-O arquivo utilizado pelo modelo é:
-
-
-yolo11n.pt
-
-
-Exemplos de objetos que podem ser retornados:
-
-
-person
-
-car
-
-chair
-
-backpack
-
-
-O aplicativo possui tratamento para apresentar alguns desses resultados em português, por exemplo:
-
-
-Pessoa detectada
-
-Carro detectado
-
-Cadeira detectada
-
-Mochila detectada
-
-
-Quando nenhum objeto é identificado:
-
-
-Nada Detectado
-
-
----
-
-7. Imagens recebidas
-
-As fotografias recebidas pelo servidor são armazenadas em:
-
-
-servidor/recebidas/
-
-
-Cada fotografia recebe um nome contendo a data e o horário.
-
-Exemplo:
-
-
-foto_20260907_125700.jpg
-
-
-Isso evita que uma nova fotografia substitua automaticamente a anterior.
-
----
-
-8. Dependências do servidor
-
-As dependências Python estão registradas em:
-
-
-servidor/requirements.txt
-
-
-Conteúdo:
-
-
-ultralytics
-
-opencv-python
-
-
----
-
-9. Como executar o servidor Python
-
-Acessar a pasta
-
-
-cd "C:\Users\Vinicius\Documents\trabalho_02_SD\servidor"
-
-
-Criar o ambiente virtual
-
-Na primeira configuração:
-
-
+# 2. Crie o ambiente virtual (só na primeira vez)
 python -m venv venv
 
+# 3. Ative o ambiente virtual
+# Windows (PowerShell):
+venv\Scripts\Activate.ps1
+# Windows (Prompt de Comando):
+venv\Scripts\activate.bat
+# Linux/macOS:
+source venv/bin/activate
 
-Ativar o ambiente virtual
-
-
-.\venv\Scripts\Activate.ps1
-
-
-Instalar as dependências
-
-
+# 4. Instale as dependências (só na primeira vez)
 pip install -r requirements.txt
+```
 
+> ⏳ O `pip install` baixa o `ultralytics` e o PyTorch (pode levar alguns minutos e
+> ocupar ~2 GB). É normal demorar.
 
-Executar o servidor
-
-
+```bash
+# 5. Inicie o servidor
 python server.py
-
+```
 
 Resultado esperado:
 
-
+```
 ==============================
-
- SERVIDOR DE DETECÇÃO
-
+ SERVIDOR DE DETECÇÃO
 ==============================
-
-Porta: 5000
-
+Porta: 8080
+IPs deste computador:
+  192.168.43.10
+Descoberta automática ativa (UDP porta 8081).
 Aguardando imagem...
+```
 
+> 💡 A **descoberta automática** (botão **Procurar servidor** do app) usa UDP na
+> porta 8081. Se quiser que ela funcione, libere também a porta UDP no firewall:
+>
+> ```powershell
+> netsh advfirewall firewall add rule name="Detector SD Descoberta" dir=in action=allow protocol=UDP localport=8081 profile=any
+> ```
+>
+> Sem essa regra, o botão de busca não encontra o servidor (mas digitar o IP
+> manualmente continua funcionando, com a regra TCP abaixo).
 
-O servidor deve permanecer em execução durante a utilização do aplicativo.
+O servidor fica **aguardando imagens o tempo todo**. Deixe esta janela aberta.
 
----
+> ⚠️ **Trocou de rede (hotspot, cabo USB, outro Wi-Fi)? O IP do notebook muda!**
+> Use sempre o IP exibido na própria janela do servidor ("IPs deste computador")
+> para a rede atual: hotspot do celular costuma ser `192.168.43.x` e tethering USB
+> `192.168.42.x`. O hotspot/tethering também costuma ser tratado pelo Windows como
+> rede **"Pública"** — por isso a regra do firewall deve usar `profile=any`.
 
-10. Teste do servidor
+### Liberar o firewall (Windows) — importante!
 
-Antes da integração com o aplicativo Flutter, foi utilizado o cliente auxiliar:
+Na primeira execução, o Windows pode perguntar se deseja permitir o Python na rede.
+Clique em **Permitir acesso** (redes privadas). Se já fechou essa janela e o celular
+não consegue conectar, libere manualmente:
 
+```powershell
+netsh advfirewall firewall add rule name="Python Server" dir=in action=allow program="C:\caminho\do\seu\python.exe" enable=yes
+```
 
-servidor/cliente_teste.py
+Ou, liberando diretamente a **porta TCP 8080** (mais simples e cobre todos os perfis de rede):
 
+```powershell
+netsh advfirewall firewall add rule name="Detector SD" dir=in action=allow protocol=TCP localport=8080 profile=any
+```
 
-Para executar:
+> 💡 **Por que `profile=any`?** Ao conectar no hotspot do celular (ou tethering USB),
+> o Windows classifica a rede como **Pública** e aplica o bloqueio mais restritivo.
+> Regras criadas só para redes privadas (ou a janela "Permitir acesso" respondida
+> sem marcar ambas as redes) não valem nesses casos. `profile=any` cobre tudo.
 
-
-python cliente_teste.py
-
-
-O teste confirmou o funcionamento do envio da imagem, processamento pelo servidor e retorno da resposta.
-
-Em um dos testes realizados, foi obtido:
-
-
-Objetos detectados:
-
-Nada Detectado
-
-
-Esse resultado confirmou também o funcionamento do tratamento para imagens em que nenhum objeto reconhecido pelo modelo é identificado.
-
----
-
-11. Configuração de IP e porta
-
-O aplicativo deve utilizar o endereço IPv4 do computador onde o servidor Python está sendo executado.
-
-No Windows, o endereço pode ser consultado com:
-
-
-ipconfig
-
-
-Deve-se localizar:
-
-
-Endereço IPv4
-
-
-Exemplo:
-
-
-192.168.0.105
-
-
-Nesse exemplo:
-
-
-IP: 192.168.0.105
-
-Porta: 5000
-
-
-O endereço apresentado é apenas um exemplo. Deve ser utilizado o IPv4 real do computador durante o teste.
-
-Em um dispositivo Android físico, não deve ser utilizado 127.0.0.1 ou localhost para acessar diretamente o servidor executado no computador.
-
-O computador e o dispositivo Android devem possuir conectividade de rede entre si.
+Ou: **Configurações → Firewall do Windows Defender → Permitir um aplicativo → Python**.
 
 ---
 
-12. Configuração do Flutter
+## 3. Descobrindo o IP do notebook
 
-O Flutter SDK foi instalado em:
+O celular precisa do **endereço IPv4** do notebook na rede local:
 
+| Sistema | Comando |
+|---|---|
+| Windows | `ipconfig` (procure por "Endereço IPv4", ex.: `192.168.0.105`) |
+| Linux | `ip a` ou `hostname -I` |
+| macOS | `ifconfig` ou `ipconfig getifaddr en0` |
 
-C:\Users\Vinicius\develop\flutter
-
-
-Como o Flutter ainda não foi adicionado ao PATH do Windows, durante o desenvolvimento os comandos podem ser executados utilizando:
-
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat"
-
-
-O projeto Flutter foi criado com:
-
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" create app_detector
-
-
-Esse comando criou automaticamente a estrutura inicial do projeto Flutter.
-
-O código padrão de demonstração gerado pelo Flutter em lib/main.dart foi posteriormente substituído pela implementação do aplicativo de detecção de objetos.
+> ⚠️ **Não use `127.0.0.1` nem `localhost` no celular**: para o celular, esses
+> endereços apontam para o **próprio celular**, não para o seu PC.
 
 ---
 
-13. Dependências do aplicativo Flutter
+## 4. Passo a passo – Usando o app no celular
 
-Acessar a pasta:
+### Opção A – Instalar o APK (mais simples)
 
+1. Gere o APK no notebook (pasta `app_detector`):
+   ```bash
+   cd app_detector
+   flutter build apk --debug --target-platform android-arm64
+   ```
+   O arquivo sai em `app_detector/build/app/outputs/flutter-apk/app-debug.apk`.
+2. Copie o APK para o celular (cabo USB, Google Drive, WhatsApp, etc.) e toque nele
+   para instalar (autorize "fontes desconhecidas" se pedir).
+3. Abra o aplicativo **Detector de Objetos** e permita o acesso à **câmera**.
 
-cd "C:\Users\Vinicius\Documents\trabalho_02_SD\app_detector"
+### Opção B – Rodar pelo cabo USB (para desenvolvimento)
 
+1. No celular, ative **Opções do desenvolvedor** (toque 7 vezes em "Número da versão"
+   em Configurações → Sobre o telefone) e ligue a **Depuração USB**.
+2. Conecte o celular ao notebook por cabo USB.
+3. Na pasta `app_detector`:
+   ```bash
+   flutter pub get
+   flutter devices        # confirme que o celular aparece
+   flutter run
+   ```
 
-O pacote camera foi instalado com:
+### Conectando celular e notebook (importante!)
 
+> ⚠️ **O Wi-Fi da UFPI (e da maioria das universidades) bloqueia a comunicação
+> direta entre aparelhos** — celular e notebook não conseguem se enxergar, em
+> nenhuma porta, mesmo com tudo configurado certo (o app dá "tempo esgotado na
+> conexão"). Isso não tem conserto pelo lado do app.
 
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" pub add camera
+**Opção A – Hotspot do celular (recomendada, funciona sempre)**
 
+1. No **celular**: Configurações → **Ponto de acesso / Hotspot** → ative.
+2. No **notebook**: conecte o Wi-Fi **no hotspot do celular** (não no da UFPI!).
+3. Abra o app → toque em **Procurar servidor** → ele preenche IP e porta sozinho.
+4. Toque em **Tirar e Analisar**.
 
-O pacote image foi instalado com:
+**Opção B – Cabo USB (tethering, alternativa ao hotspot)**
 
+1. Conecte o celular no notebook por cabo USB.
+2. Ative **Configurações → Rede → Compartilhamento de internet por USB**
+   (tethering USB). O celular passa a enxergar o notebook nessa rede,
+   sem depender de Wi-Fi.
+3. Abra o app → **Procurar servidor** → **Tirar e Analisar**.
 
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" pub add image
+> 💡 Essas redes são criadas pelo **seu** celular, então nada é bloqueado:
+> não há isolamento de clientes, e o hotspot não precisa de internet móvel
+> para o app funcionar (o tráfego é só celular ↔ notebook).
 
+### Usando o aplicativo
 
-Esses comandos atualizaram automaticamente o arquivo:
-
-
-pubspec.yaml
-
-
-As dependências utilizadas pelo aplicativo são:
-
-
-camera
-
-image
-
-
-A comunicação TCP utiliza:
-
-
-dart:io
-
-
-Como dart:io pertence ao próprio Dart, não é necessária uma instalação adicional.
-
----
-
-14. Implementação do aplicativo
-
-O código principal está em:
-
-
-app_detector/lib/main.dart
-
-
-O aplicativo implementa:
-
-inicialização da câmera;
-
-campo para IP do servidor;
-
-campo para porta;
-
-visualização da câmera;
-
-botão Tirar e Analisar**;
-
-captura da fotografia;
-
-correção da orientação da imagem;
-
-redução para largura máxima de 1280 pixels;
-
-codificação JPEG com qualidade 80;
-
-conexão Socket TCP;
-
-envio do tamanho em 4 bytes;
-
-envio dos bytes da fotografia;
-
-recebimento da resposta do servidor;
-
-apresentação da fotografia capturada;
-
-apresentação do resultado da detecção;
-
-tratamento de Nada Detectado;
-
-possibilidade de realizar uma nova análise.
+1. Toque em **Procurar servidor**. O app envia um "ping" em broadcast na rede e
+   preenche **IP** e **Porta** automaticamente quando o servidor responde:
+   - **"Servidor encontrado!"** → pronto para usar.
+   - **"Nenhum servidor encontrado"** → confira se o `server.py` está rodando e
+     se celular e notebook estão na mesma rede (no Wi-Fi da UFPI não funciona;
+     use hotspot ou cabo USB, como explicado acima).
+   - Prefere digitar manualmente? Preencha IP e Porta à mão e siga normal.
+2. Toque em **Tirar e Analisar**.
+3. O app captura a foto, envia ao servidor e mostra o resultado:
+   - `Pessoa detectada`
+   - `Carro detectado`
+   - `Cadeira detectada`
+   - `Mochila detectada`
+   - ou `Nada Detectado`
+4. Toque novamente em **Tirar e Analisar** para uma nova foto → o servidor analisa de
+   novo e o resultado é atualizado.
 
 ---
 
-15. Permissões do Android
+## 5. Testando o servidor sem o celular
 
-Para permitir o acesso à câmera e à rede, foram adicionadas ao arquivo:
+Antes (ou sem) usar o app, é possível validar o servidor com um cliente Python:
 
+```bash
+cd servidor
+python cliente_teste.py                # gera uma imagem de teste automaticamente
+python cliente_teste.py caminho/foto.jpg   # ou envia uma foto existente
 
-app_detector/android/app/src/main/AndroidManifest.xml
+# Testar a partir de outra máquina da rede (ex.: simulando o celular):
+python cliente_teste.py --host 192.168.0.105 --porta 8080
 
+# Apenas validar a conexão (sonda rápida, sem enviar imagem):
+python cliente_teste.py --host 192.168.0.105 --testar
 
-as seguintes permissões:
+# Descobrir o servidor na rede automaticamente (broadcast UDP):
+python cliente_teste.py --descobrir
+```
 
+O servidor deve responder com os objetos detectados ou `Nada Detectado`.
 
-\<uses-permission android:name="android.permission.CAMERA" />
-
-\<uses-permission android:name="android.permission.INTERNET" />
-
-
-A permissão CAMERA permite o acesso à câmera do dispositivo.
-
-A permissão INTERNET permite a comunicação do aplicativo com o servidor Python pela rede.
-
----
-
-16. Verificação do código Flutter
-
-Após a implementação, o código foi verificado utilizando:
-
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" analyze
-
-
-Durante a verificação inicial foram encontrados problemas relacionados ao recebimento da resposta TCP e ao teste padrão criado pelo Flutter.
-
-O recebimento da resposta foi ajustado para trabalhar corretamente com os bytes retornados pelo Socket.
-
-O arquivo de teste padrão:
-
-
-test/widget_test.dart
-
-
-foi removido porque correspondia ao aplicativo de contador criado automaticamente pelo Flutter e não representava mais a aplicação desenvolvida.
-
-Após os ajustes, foi executado novamente:
-
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" analyze
-
-
-Resultado:
-
-
-Analyzing app_detector...
-
-No issues found!
-
-
-Portanto, a análise estática do código Flutter foi concluída sem erros.
+> 💡 O botão **Testar conexão** do app envia exatamente essa mesma sonda
+> (4 bytes com tamanho 0), que o servidor responde com `OK` sem processar nada.
 
 ---
 
-17. Configuração do ambiente Android
+## 6. Protocolo de comunicação
 
-Para verificar o ambiente de desenvolvimento foi utilizado:
+A comunicação entre o app e o servidor usa **Socket TCP** com o protocolo:
 
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" doctor
+```
+4 bytes (tamanho da imagem, inteiro de 32 bits Big Endian) + N bytes (foto JPEG)
+```
 
-O Flutter SDK utilizado durante o desenvolvimento foi instalado em:
+**Casos especiais do protocolo:**
 
-C:\Users\Vinicius\develop\flutter
+- **Tamanho `0`** → sonda de teste de conexão (botão **Testar conexão** do app e
+  `cliente_teste.py --testar`). O servidor responde `OK` imediatamente, sem
+  processar imagem.
 
-Como o comando flutter não estava adicionado ao PATH do Windows, os comandos foram executados diretamente por meio do arquivo flutter.bat.
+| Etapa | Quem envia | Conteúdo |
+|---|---|---|
+| 1 | Aplicativo | 4 bytes com o tamanho da foto |
+| 2 | Aplicativo | Bytes da foto em JPEG |
+| 3 | Servidor | Texto com os objetos detectados (separados por vírgula) ou `Nada Detectado` |
 
-Para preparar o ambiente Android, o Android Studio foi instalado com:
-
-winget install --id Google.AndroidStudio -e --source winget
-
-Por meio do ambiente Android foram configurados os componentes necessários para a compilação. Durante o processo foram utilizados:
-
-Android SDK Platform 36
-NDK 28.2.13676358
-
-O Android SDK utilizado ficou localizado em:
-
-C:\Users\Vinicius\AppData\Local\Android\Sdk
-
-Durante a configuração, o Flutter apresentou um aviso relacionado à verificação das licenças das ferramentas de linha de comando. Entretanto, durante a compilação a licença do Android SDK Platform 36 foi reconhecida como aceita e a plataforma foi instalada/configurada corretamente.
-
-Também foi necessário instalar o NDK 28.2.13676358, utilizado pelo processo de compilação Android.
-
-Problema encontrado com o caminho do projeto
-
-Inicialmente o projeto estava em uma pasta chamada:
-
-trabalho_02_(SD)
-
-Os parênteses no nome do diretório causaram problema durante a execução do Gradle no Windows. Por isso, a pasta foi renomeada para:
-
-trabalho_02_SD
-
-Depois dessa alteração o Gradle conseguiu continuar o processo de compilação.
-
-Problema de memória durante a compilação
-
-Na primeira compilação Android, o processo llvm-strip do NDK tentou processar a biblioteca Flutter para a arquitetura x86_64 e apresentou:
-
-LLVM ERROR: out of memory
-Allocation failed
-
-Como o objetivo do projeto é executar o aplicativo em um dispositivo Android físico compatível com ARM64, a compilação foi limitada a essa arquitetura.
-
-O comando que efetivamente concluiu a geração do APK foi:
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" build apk --debug --target-platform android-arm64
-
-Resultado obtido:
-
-Built build\app\outputs\flutter-apk\app-debug.apk
-
-Portanto, o APK de depuração foi gerado com sucesso em:
-
-app_detector/build/app/outputs/flutter-apk/app-debug.apk
-
-Os avisos sobre versões mais recentes de algumas dependências não impediram a compilação e não foi necessário atualizar esses pacotes.
-
-18. Como executar o aplicativo Flutter
-
-18.1 Para quem baixar/clonar o projeto
-
-É necessário ter o Flutter e o ambiente Android configurados no computador. Depois, acesse a pasta do aplicativo:
-
-cd app_detector
-
-Como camera e image já estão declarados no pubspec.yaml, não é necessário adicioná-los novamente. Basta restaurar as dependências do projeto:
-
-flutter pub get
-
-Verifique o ambiente:
-
-flutter doctor
-
-Verifique os dispositivos Android disponíveis:
-
-flutter devices
-
-Com um celular Android conectado e com a Depuração USB habilitada, execute:
-
-flutter run
-
-Se for necessário gerar o APK ARM64 utilizado neste projeto:
-
-flutter build apk --debug --target-platform android-arm64
-
-O arquivo será gerado em:
-
-build/app/outputs/flutter-apk/app-debug.apk
-
-18.2 Comandos utilizados no computador de desenvolvimento
-
-Como o Flutter não estava no PATH, durante o desenvolvimento foram utilizados os comandos:
-
-cd "C:\Users\Vinicius\Documents\trabalho_02_SD\app_detector"
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" pub get
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" analyze
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" devices
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" run
-
-Para gerar o APK:
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" build apk --debug --target-platform android-arm64
-
-No aplicativo deverá ser informado:
-
-IP: endereço IPv4 do computador que executa server.py
-Porta: 5000
-
-O IPv4 pode ser consultado no computador com:
-
-ipconfig
-
-O servidor Python deve estar em execução antes de solicitar a análise da fotografia.
-
-19. Capturas de tela
-
-As capturas de tela serão adicionadas após o teste completo da integração.
-
-Tela do aplicativo
-
-
-[CAPTURA DE TELA SERÁ INSERIDA APÓS O TESTE]
-
-
-Imagem capturada
-
-
-[CAPTURA DE TELA SERÁ INSERIDA APÓS O TESTE]
-
-
-Resultado da detecção
-
-
-[CAPTURA DE TELA SERÁ INSERIDA APÓS O TESTE]
-
+A foto é preparada no app: **JPEG com qualidade ~80** e **largura máxima de 1280 px**
+(redimensionada quando necessário). O servidor salva cada foto em
+`servidor/recebidas/` com nome contendo data/hora/milissegundos
+(ex.: `foto_20260908_124150_123.jpg`).
 
 ---
 
-20. Status do desenvolvimento
+## 7. Detecção de objetos
 
-Concluído
+- Biblioteca: **Ultralytics** (`ultralytics`)
+- Modelo: **YOLO11n** (`servidor/yolo11n.pt`)
+- Processamento de imagem: **OpenCV** (`opencv-python`)
+- Código: `servidor/detector.py`
 
-Estrutura do servidor Python
+Exemplos de classes que o modelo reconhece: `person`, `car`, `chair`, `backpack` —
+exibidas no app em português (Pessoa, Carro, Cadeira, Mochila). Qualquer outra classe
+do COCO (80 classes) também é retornada com o nome original em inglês.
 
-Ambiente virtual Python
+---
 
-Dependências do servidor
+## 8. Estrutura do projeto
 
-Servidor Socket TCP
+```
+.
+├── servidor/
+│   ├── server.py            # Servidor Socket TCP
+│   ├── detector.py          # Detecção com YOLO11n
+│   ├── cliente_teste.py     # Cliente de teste (sem celular)
+│   ├── requirements.txt     # Dependências Python
+│   ├── yolo11n.pt           # Modelo de detecção
+│   └── recebidas/           # Fotos recebidas (criada automaticamente)
+│
+├── app_detector/            # Aplicativo Flutter
+│   ├── lib/main.dart        # Código principal do app
+│   ├── pubspec.yaml         # Dependências (camera, image)
+│   └── android/             # Projeto Android gerado pelo Flutter
+│
+└── README.md
+```
 
-Protocolo de 4 bytes + fotografia
+---
 
-Salvamento das fotografias com timestamp
+## 9. Solução de problemas
 
-Ultralytics
+| Problema | Causa provável / Solução |
+|---|---|
+| **"Tempo esgotado na conexão"** (errno 110) | Os pacotes estão sendo **descartados** antes de chegar ao servidor. Causas: celular usando **dados móveis** (desligue o 4G/5G), **firewall descartando** a porta 8080 (libere com `netsh advfirewall firewall add rule name="Detector SD" dir=in action=allow protocol=TCP localport=8080 profile=any`), **IP errado** (use o IPv4 do adaptador Wi-Fi ativo; VPN/WSL criam IPs falsos) ou **isolamento de clientes** na rede (use hotspot do celular). Confirme com o botão **Testar conexão** |
+| **Não conecta mesmo com hotspot ou cabo USB** | 1. **O IP do notebook mudou!** Ao trocar de rede o IP é outro: hotspot do celular costuma ser `192.168.43.x`, tethering USB `192.168.42.x` — confira o IP atual na janela do `server.py` ("IPs deste computador") e digite-o no app. 2. O Windows trata hotspot/tethering como rede **"Pública"** e bloqueia a porta: a regra do firewall precisa usar `profile=any` (comando acima) — a janela "Permitir acesso" do Python costuma liberar só redes privadas. 3. No tethering USB, confirme que o **Compartilhamento de internet por USB** está ativo no celular |
+| **"Conexão recusada"** | O servidor não está escutando na porta 8080 (confira se a janela mostra "Aguardando imagem...") |
+| **"A foto foi enviada, mas o servidor não respondeu em 60 s"** | A conexão e o envio funcionaram — o problema é o processamento. Veja a janela do servidor: a primeira detecção pode levar 5–15 s (warm-up do YOLO); se passar disso, o servidor travou ou está lento demais |
+| "Falha ao enviar a foto" | Conexão caiu no meio do upload (rede Wi-Fi fraca) — tente de novo |
+| O celular não conecta | Os dois aparelhos precisam estar na **mesma rede Wi-Fi**, na **mesma sub-rede** (ex.: ambos `192.168.0.x`) e **sem dados móveis** no celular. Teste com `python cliente_teste.py --host IP_DO_PC --testar` a partir de outro PC da rede |
+| Erro de câmera ao abrir o app | Permissão de câmera negada — conceda em Configurações do Android ou reinstale o APK |
+| `flutter` não é reconhecido | Flutter não está no PATH — use o caminho completo ou adicione ao PATH |
+| Demora no primeiro `pip install` | O PyTorch/Ultralytics é grande (~2 GB); é normal |
+| Duas fotos no mesmo segundo | Agora o nome inclui milissegundos, então nenhuma foto é sobrescrita |
 
-YOLO11n
+---
 
-Detecção de objetos
+## 10. Capturas de tela
 
-Retorno do resultado pelo servidor
+*Capturas a adicionar após o teste em dispositivo físico:*
 
-Tratamento de Nada Detectado
+- **Tela do aplicativo** (com o preview da câmera, IP e porta):
 
-Teste local cliente-servidor em Python
+  `[CAPTURA DE TELA DO APP]`
 
-Instalação do Flutter SDK
+- **Imagem capturada** (exibida no app após "Tirar e Analisar"):
 
-Criação do projeto app_detector
+  `[CAPTURA DA IMAGEM CAPTURADA]`
 
-Instalação do pacote camera
+- **Resultado da detecção** (objetos detectados na tela do app):
 
-Instalação do pacote image
+  `[CAPTURA DO RESULTADO DA DETECÇÃO]`
 
-Implementação do main.dart
+---
 
-Configuração da permissão CAMERA
+## 11. Requisitos da entrega (checklist)
 
-Configuração da permissão INTERNET
+- [x] App Android (Flutter) que captura foto com o pacote `camera`
+- [x] Envio via Socket TCP (`dart:io`) com protocolo `4 bytes + imagem`
+- [x] Foto em JPEG, qualidade ~80, largura máxima de 1280 px
+- [x] Servidor Python com Socket TCP, OpenCV e YOLO11n
+- [x] Servidor salva a imagem recebida com timestamp
+- [x] Servidor retorna os objetos identificados
+- [x] App exibe o resultado ("Pessoa detectada", ..., ou "Nada Detectado")
+- [x] Nova foto → nova análise com resultado atualizado
+- [x] README com como rodar servidor e app, configuração de IP/porta, código e modelo
+- [ ] Capturas de tela do app, imagem capturada e resultado da detecção (após teste no celular)
 
-Implementação da captura da fotografia no código
+---
 
-Implementação do processamento JPEG no código
+## 12. Notas de desenvolvimento
 
-Implementação do envio TCP no código
-
-Implementação do recebimento da resposta no código
-
-Implementação da exibição do resultado no código
-
-Verificação com flutter analyze
-
-Correção dos problemas encontrados pelo analisador
-
-flutter analyze concluído com No issues found!
-
-Instalação do Android Studio
-
-Configuração do Android SDK
-
-Android SDK Platform 36 disponível
-
-NDK 28.2.13676358 disponível
-
-Correção do caminho do projeto de trabalho_02_(SD) para trabalho_02_SD
-
-Compilação do aplicativo para Android ARM64
-
-Geração do app-debug.apk
-
-Pendente somente de teste final
-
-Conectar um dispositivo Android físico
-
-Verificar o dispositivo com flutter devices
-
-Executar o aplicativo no Android
-
-Autorizar e testar a câmera no dispositivo
-
-Testar Flutter → servidor Python
-
-Confirmar o recebimento da resposta no Android
-
-Testar uma segunda fotografia/nova análise
-
-Adicionar as capturas de tela finais
-
-Atualizar esta documentação com o resultado do teste final
-
-21. Situação atual
-
-O servidor Python está implementado e foi validado com o cliente Python auxiliar. Nesse teste foi confirmado o protocolo TCP utilizado pelo trabalho: envio de 4 bytes com o tamanho da fotografia, envio da imagem, processamento pelo YOLO11n e retorno da resposta pelo servidor.
-
-O aplicativo Flutter também está implementado. O main.dart realiza a inicialização da câmera, captura da fotografia, correção de orientação, redimensionamento quando necessário, codificação JPEG com qualidade 80, comunicação Socket TCP e apresentação do resultado.
-
-A análise estática foi concluída com:
-
-Analyzing app_detector...
-No issues found!
-
-O ambiente necessário para a compilação Android também foi configurado. Foram utilizados o Android SDK Platform 36 e o NDK 28.2.13676358.
-
-Durante o desenvolvimento ocorreram dois problemas importantes:
-
-O nome antigo da pasta trabalho_02_(SD) interferia na execução do Gradle no Windows. O diretório foi renomeado para trabalho_02_SD.
-
-A compilação envolvendo x86_64 apresentou falta de memória no llvm-strip. Para o APK destinado ao celular Android ARM64, foi utilizada a compilação específica para android-arm64.
-
-O comando que concluiu a compilação foi:
-
-& "$env:USERPROFILE\develop\flutter\bin\flutter.bat" build apk --debug --target-platform android-arm64
-
-Resultado:
-
-Built build\app\outputs\flutter-apk\app-debug.apk
-
-Assim, neste momento o servidor, o aplicativo, a análise estática e a geração do APK estão concluídos.
-
-A etapa restante é o teste de integração em um celular Android físico:
-
-Android/Flutter
-      ↓
-Captura da fotografia
-      ↓
-JPEG – qualidade 80
-largura máxima 1280 px
-      ↓
-Socket TCP
-      ↓
-4 bytes + fotografia
-      ↓
-Servidor Python
-      ↓
-YOLO11n
-      ↓
-Objetos detectados
-      ↓
-Resposta TCP
-      ↓
-Resultado no aplicativo
-
-Após esse teste, devem ser inseridas no README as capturas da tela do aplicativo, da imagem capturada e do resultado da detecção.
+- O APK foi compilado para **ARM64** (`--target-platform android-arm64`), a
+  arquitetura dos celulares Android atuais.
+- Evite parênteses no caminho da pasta do projeto (ex.: `trabalho_02_(SD)`), pois o
+  Gradle no Windows pode falhar — use nomes como `trabalho_02_SD`.
+- O pacote `image` é usado para corrigir a orientação (EXIF) da foto antes do envio,
+  garantindo que a imagem chegue "em pé" ao servidor.

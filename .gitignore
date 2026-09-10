@@ -40,4 +40,3 @@ app_detector/windows/
 
 # Arquivos auxiliares que não fazem parte da entrega
 app_detector/README.md
-servidor/cliente_teste.py
