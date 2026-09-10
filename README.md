@@ -1,4 +1,4 @@
-# Trabalho 02 – Sistemas Distribuídos
+\# Trabalho 02 – Sistemas Distribuídos
 
 ## Aplicativo Android para Detecção de Objetos (Foto via Botão → Servidor Python por Sockets)
 
@@ -155,9 +155,32 @@ Ou: **Configurações → Firewall do Windows Defender → Permitir um aplicativ
 
 ---
 
-## 3. Descobrindo o IP do notebook
+## 3. Configurando o IP e a porta da comunicação
 
-O celular precisa do **endereço IPv4** do notebook na rede local:
+### 3.1 Onde o IP e a porta ficam configurados
+
+**No servidor (`servidor/server.py`, constantes no topo do arquivo):**
+
+```python
+HOST = "0.0.0.0"        # escuta em todas as interfaces de rede
+PORT = 8080             # porta TCP que recebe as imagens
+DISCOVERY_PORT = 8081   # porta UDP da descoberta automática
+```
+
+**No aplicativo (`app_detector/lib/main.dart`):** o IP e a porta **não são fixos
+no código** — são informados na tela inicial, nos campos **"IP do servidor"** e
+**"Porta"** (a porta já vem preenchida com `8080`). O botão **Procurar servidor**
+preenche os dois automaticamente; a porta UDP `8081` usada nessa busca está fixa
+dentro do método `_procurarServidor`.
+
+> 💡 Ou seja: em condições normais **não é preciso editar código nenhum** — basta
+> digitar (ou descobrir) o IP no app e manter a porta padrão `8080`.
+
+### 3.2 Descobrindo o IP do notebook
+
+O celular precisa do **endereço IPv4** do notebook na rede local. A fonte mais
+confiável é a própria janela do servidor ("IPs deste computador"), mas também dá
+para descobrir manualmente:
 
 | Sistema | Comando |
 |---|---|
@@ -167,6 +190,18 @@ O celular precisa do **endereço IPv4** do notebook na rede local:
 
 > ⚠️ **Não use `127.0.0.1` nem `localhost` no celular**: para o celular, esses
 > endereços apontam para o **próprio celular**, não para o seu PC.
+
+### 3.3 Mudando a porta (se necessário)
+
+1. Edite `PORT` no início de `servidor/server.py` (ex.: `PORT = 9090`) e reinicie o servidor.
+2. Digite a nova porta no campo **"Porta"** do app — ou, para mudar o valor padrão,
+   altere o `TextEditingController(text: '8080')` do `_portaController` em `main.dart`
+   e recompile o app.
+3. Atualize a regra do firewall para a nova porta (troque o `localport=8080` do
+   comando mostrado na seção 2).
+4. Se mudar também a `DISCOVERY_PORT` no servidor, altere a porta `8081` usada no
+   `udp.send(...)` dentro de `_procurarServidor` em `main.dart` (senão a busca
+   automática para de funcionar; digitar IP/porta manualmente continua ok).
 
 ---
 
@@ -326,6 +361,7 @@ do COCO (80 classes) também é retornada com o nome original em inglês.
 │   ├── pubspec.yaml         # Dependências (camera, image)
 │   └── android/             # Projeto Android gerado pelo Flutter
 │
+├── screenshots/             # Capturas de tela (app, imagem capturada, resultado)
 └── README.md
 ```
 
@@ -350,19 +386,28 @@ do COCO (80 classes) também é retornada com o nome original em inglês.
 
 ## 10. Capturas de tela
 
-*Capturas a adicionar após o teste em dispositivo físico:*
+Capturas do teste em dispositivo físico (arquivos na pasta `screenshots/`):
 
-- **Tela do aplicativo** (com o preview da câmera, IP e porta):
+### 10.1 Tela do aplicativo
 
-  `[CAPTURA DE TELA DO APP]`
+Preview da câmera com os campos de **IP** e **Porta** e os botões de ação
+(`screenshots/app.jpg`):
 
-- **Imagem capturada** (exibida no app após "Tirar e Analisar"):
+![Tela do aplicativo](screenshots/app.jpg)
 
-  `[CAPTURA DA IMAGEM CAPTURADA]`
+### 10.2 Imagem capturada
 
-- **Resultado da detecção** (objetos detectados na tela do app):
+Foto exibida no app logo após tocar em **Tirar e Analisar**, na seção
+"Imagem capturada" (`screenshots/imagem_capturada.jpg`):
 
-  `[CAPTURA DO RESULTADO DA DETECÇÃO]`
+![Imagem capturada](screenshots/imagem_capturada.jpg)
+
+### 10.3 Resultado da detecção
+
+Objetos identificados pelo servidor exibidos na seção "Resultado" do app
+(ex.: "Pessoa detectada") (`screenshots/resultado_deteccao.jpg`):
+
+![Resultado da detecção](screenshots/resultado_deteccao.jpg)
 
 ---
 
@@ -377,7 +422,7 @@ do COCO (80 classes) também é retornada com o nome original em inglês.
 - [x] App exibe o resultado ("Pessoa detectada", ..., ou "Nada Detectado")
 - [x] Nova foto → nova análise com resultado atualizado
 - [x] README com como rodar servidor e app, configuração de IP/porta, código e modelo
-- [ ] Capturas de tela do app, imagem capturada e resultado da detecção (após teste no celular)
+- [x] Capturas de tela do app, imagem capturada e resultado da detecção
 
 ---
 
