@@ -1,0 +1,42 @@
+# Python
+servidor/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Flutter / Dart
+app_detector/.dart_tool/
+app_detector/build/
+app_detector/.flutter-plugins
+app_detector/.flutter-plugins-dependencies
+
+# Android / Gradle
+**/.gradle/
+*.jks
+*.keystore
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos temporários
+*.tmp
+*.log
+
+# Imagens usadas apenas nos testes locais
+servidor/recebidas/
+servidor/teste.jpg
+
+# Plataformas Flutter não utilizadas neste trabalho
+app_detector/ios/
+app_detector/linux/
+app_detector/macos/
+app_detector/web/
+app_detector/windows/
+
+# Arquivos auxiliares que não fazem parte da entrega
+app_detector/README.md
